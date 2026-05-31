@@ -35,8 +35,19 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode = __toESM(require("vscode"));
-function activate(context) {
-  console.log('Congratulations, your extension "code-city" is now active!');
+async function activate(context) {
+  console.log('Congratulations, your extension "code-city" is now activeeeeeeee!');
+  const files = await vscode.workspace.findFiles(
+    "**/*",
+    "**/{node_modules,dist,.git}/**"
+  );
+  for (const file of files) {
+    console.log(file.path);
+    const content = await vscode.workspace.fs.readFile(file);
+    const text = Buffer.from(content).toString("utf8");
+    const lines = text.split("\n").length;
+    console.log("linhas: " + lines);
+  }
   const disposable = vscode.commands.registerCommand("code-city.helloWorld", () => {
     vscode.window.showInformationMessage("Hello World from Code City!");
   });
