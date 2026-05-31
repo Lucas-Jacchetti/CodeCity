@@ -31,9 +31,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var extension_exports = {};
 __export(extension_exports, {
   activate: () => activate,
-  deactivate: () => deactivate,
-  getFiles: () => getFiles,
-  getLine: () => getLine
+  deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode = __toESM(require("vscode"));
@@ -54,21 +52,37 @@ var FileData = class {
 var path = __toESM(require("path"));
 async function activate(context) {
   console.log('Congratulations, your extension "code-city" is now activeeeeeeee!');
-  const allowedExtensions = [
-    ".ts",
-    ".tsx",
-    ".js",
-    ".jsx",
-    ".json",
-    ".css",
-    ".html"
+  const disallowedExtensions = [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".mp4",
+    ".mp3",
+    ".wav",
+    ".zip",
+    ".rar",
+    ".7z",
+    ".pdf"
+  ];
+  const disallowedFiles = [
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml"
   ];
   const dataArray = [];
   const files = await getFiles();
   for (const file of files) {
     const ext = path.extname(file.path);
+    const fileName = path.basename(file.path);
     const lineCount = await getLine(file);
-    if (!allowedExtensions.includes(ext)) {
+    if (disallowedExtensions.includes(ext)) {
+      continue;
+    }
+    if (disallowedFiles.includes(fileName)) {
       continue;
     }
     const data = new FileData(file.path, lineCount, ext);
@@ -93,8 +107,6 @@ async function getLine(file) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   activate,
-  deactivate,
-  getFiles,
-  getLine
+  deactivate
 });
 //# sourceMappingURL=extension.js.map
