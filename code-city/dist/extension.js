@@ -31,22 +31,48 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var extension_exports = {};
 __export(extension_exports, {
   activate: () => activate,
-  deactivate: () => deactivate
+  deactivate: () => deactivate,
+  getFiles: () => getFiles,
+  getLine: () => getLine
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode = __toESM(require("vscode"));
+
+// src/Data.ts
+var FileData = class {
+  constructor(path2, lineCount, extension) {
+    this.path = path2;
+    this.lineCount = lineCount;
+    this.extension = extension;
+  }
+  path;
+  lineCount;
+  extension;
+};
+
+// src/extension.ts
+var path = __toESM(require("path"));
 async function activate(context) {
   console.log('Congratulations, your extension "code-city" is now activeeeeeeee!');
-  const files = await vscode.workspace.findFiles(
-    "**/*",
-    "**/{node_modules,dist,.git}/**"
-  );
+  const allowedExtensions = [
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".json",
+    ".css",
+    ".html"
+  ];
+  const dataArray = [];
+  const files = await getFiles();
   for (const file of files) {
-    console.log(file.path);
-    const content = await vscode.workspace.fs.readFile(file);
-    const text = Buffer.from(content).toString("utf8");
-    const lines = text.split("\n").length;
-    console.log("linhas: " + lines);
+    const ext = path.extname(file.path);
+    const lineCount = await getLine(file);
+    if (!allowedExtensions.includes(ext)) {
+      continue;
+    }
+    const data = new FileData(file.path, lineCount, ext);
+    dataArray.push(data);
   }
   const disposable = vscode.commands.registerCommand("code-city.helloWorld", () => {
     vscode.window.showInformationMessage("Hello World from Code City!");
@@ -55,9 +81,20 @@ async function activate(context) {
 }
 function deactivate() {
 }
+async function getFiles() {
+  return await vscode.workspace.findFiles("**/*", "**/{node_modules,dist,.git}/**");
+}
+async function getLine(file) {
+  const content = await vscode.workspace.fs.readFile(file);
+  const text = Buffer.from(content).toString("utf8");
+  const size = text.split("\n").length;
+  return size;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   activate,
-  deactivate
+  deactivate,
+  getFiles,
+  getLine
 });
 //# sourceMappingURL=extension.js.map
