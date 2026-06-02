@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { FileData } from "./Data";
-import { FolderNode } from "./folderNode";
+import { FileData } from "./fileData";
+import { FolderData } from "./folderData";
 import * as path from "path";
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -30,21 +30,15 @@ export async function activate(context: vscode.ExtensionContext) {
 	const dataArray: FileData[] = [];
 	const files = await getFiles();
 
-	for(const file of files){
-		const ext = path.extname(file.path);
-		const fileName = path.basename(file.path);
-		const lineCount = await getLine(file);
+	populateFileDataArray(dataArray, files, disallowedExtensions, disallowedFiles);
 
-		if (disallowedExtensions.includes(ext)) {
-			continue;
-		}
-		if (disallowedFiles.includes(fileName)) {
-			continue;
-		}
+	const root = new FolderData("root");
 
-		const data = new FileData(file.path, lineCount, ext);
-		dataArray.push(data);
+	for (const file of dataArray) {
+		addFile(root, file);
 	}
+
+	calculateMetrics(root);
 
 	const disposable = vscode.commands.registerCommand('code-city.helloWorld', () => {
 		// The code you place here will be executed every time your command is executed
@@ -60,39 +54,64 @@ async function getFiles(){
 	return await vscode.workspace.findFiles("**/*", "**/{node_modules,dist,.git}/**");
 }
 
-async function getLine(file: vscode.Uri){
+async function getLine(file: vscode.Uri): Promise<number>{
 	const content = await vscode.workspace.fs.readFile(file);
 	const text = Buffer.from(content).toString("utf8");
 	const size: number = text.split("\n").length;
 	return size;
 }
 
-function addFile(root: FolderNode, file: FileData){
-	const parts = file.path.split("/").filter(Boolean);
+function addFile(root: FolderData, file: FileData){
+	const parts = file.getPath().normalize(file.getPath()).split(path.sep).filter(Boolean);
 
 	let current = root;
 
 	for (let i = 0; i < parts.length - 1; i++) {
 		const folderName = parts[i];
 		
-		if (!current.children.has(folderName)) {
-			current.children.set(folderName, new FolderNode(folderName));
+		if (!current.getChildren().has(folderName)) {
+			current.getChildren().set(folderName, new FolderData(folderName));
 		}
 
-		current = current.children.get(folderName)!;
+		current = current.getChildren().get(folderName)!;
 	}
 
-	current.files.push(file);
+	current.getFiles().push(file);
 }
 
-function calculateFileCount(node: FolderNode){
-	let count = node.files.length;
+function calculateMetrics(node: FolderData){
+	let files = node.getFiles().length;
+	let lines = 0
 
-	for(const child of node.children.values()){
-		count += calculateFileCount(child);
+	for(const file of node.getFiles()){
+		lines += file.getLineCount();
 	}
 
-	node.fileCount = count;
+	for (const child of node.getChildren().values()) {
+        calculateMetrics(child);
 
-	return count;
+        files += child.getFileCount();
+        lines += child.getLineCount();
+    }
+
+    node.setFileCount(files);
+    node.setLineCount(lines);
+}
+
+async function populateFileDataArray(dataArray: FileData[], files: vscode.Uri[], disallowedExtensions: string[], disallowedFiles: string[]){
+	for(const file of files){
+		const ext = path.extname(file.path);
+		const fileName = path.basename(file.path);
+		const lineCount = await getLine(file);
+
+		if (disallowedExtensions.includes(ext)) {
+			continue;
+		}
+		if (disallowedFiles.includes(fileName)) {
+			continue;
+		}
+
+		const data = new FileData(file.path, lineCount, ext);
+		dataArray.push(data);
+	}
 }

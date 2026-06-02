@@ -36,16 +36,60 @@ __export(extension_exports, {
 module.exports = __toCommonJS(extension_exports);
 var vscode = __toESM(require("vscode"));
 
-// src/Data.ts
+// src/fileData.ts
 var FileData = class {
+  path;
+  lineCount;
+  extension;
   constructor(path2, lineCount, extension) {
     this.path = path2;
     this.lineCount = lineCount;
     this.extension = extension;
   }
-  path;
+  getPath() {
+    return this.path;
+  }
+  getLineCount() {
+    return this.lineCount;
+  }
+  getExtension() {
+    return this.extension;
+  }
+};
+
+// src/folderData.ts
+var FolderData = class {
+  name;
+  fileCount;
   lineCount;
-  extension;
+  children = /* @__PURE__ */ new Map();
+  files = [];
+  constructor(name) {
+    this.name = name;
+    this.fileCount = 0;
+    this.lineCount = 0;
+  }
+  getName() {
+    return this.name;
+  }
+  getLineCount() {
+    return this.lineCount;
+  }
+  setLineCount(lineCount) {
+    this.lineCount = lineCount;
+  }
+  getFileCount() {
+    return this.fileCount;
+  }
+  setFileCount(fileCount) {
+    this.fileCount = fileCount;
+  }
+  getChildren() {
+    return this.children;
+  }
+  getFiles() {
+    return this.files;
+  }
 };
 
 // src/extension.ts
@@ -75,19 +119,12 @@ async function activate(context) {
   ];
   const dataArray = [];
   const files = await getFiles();
-  for (const file of files) {
-    const ext = path.extname(file.path);
-    const fileName = path.basename(file.path);
-    const lineCount = await getLine(file);
-    if (disallowedExtensions.includes(ext)) {
-      continue;
-    }
-    if (disallowedFiles.includes(fileName)) {
-      continue;
-    }
-    const data = new FileData(file.path, lineCount, ext);
-    dataArray.push(data);
+  populateFileDataArray(dataArray, files, disallowedExtensions, disallowedFiles);
+  const root = new FolderData("root");
+  for (const file of dataArray) {
+    addFile(root, file);
   }
+  calculateMetrics(root);
   const disposable = vscode.commands.registerCommand("code-city.helloWorld", () => {
     vscode.window.showInformationMessage("Hello World from Code City!");
   });
@@ -103,6 +140,47 @@ async function getLine(file) {
   const text = Buffer.from(content).toString("utf8");
   const size = text.split("\n").length;
   return size;
+}
+function addFile(root, file) {
+  const parts = file.getPath().normalize(file.getPath()).split(path.sep).filter(Boolean);
+  let current = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const folderName = parts[i];
+    if (!current.getChildren().has(folderName)) {
+      current.getChildren().set(folderName, new FolderData(folderName));
+    }
+    current = current.getChildren().get(folderName);
+  }
+  current.getFiles().push(file);
+}
+function calculateMetrics(node) {
+  let files = node.getFiles().length;
+  let lines = 0;
+  for (const file of node.getFiles()) {
+    lines += file.getLineCount();
+  }
+  for (const child of node.getChildren().values()) {
+    calculateMetrics(child);
+    files += child.getFileCount();
+    lines += child.getLineCount();
+  }
+  node.setFileCount(files);
+  node.setLineCount(lines);
+}
+async function populateFileDataArray(dataArray, files, disallowedExtensions, disallowedFiles) {
+  for (const file of files) {
+    const ext = path.extname(file.path);
+    const fileName = path.basename(file.path);
+    const lineCount = await getLine(file);
+    if (disallowedExtensions.includes(ext)) {
+      continue;
+    }
+    if (disallowedFiles.includes(fileName)) {
+      continue;
+    }
+    const data = new FileData(file.path, lineCount, ext);
+    dataArray.push(data);
+  }
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
